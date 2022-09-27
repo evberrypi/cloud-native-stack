@@ -8,6 +8,10 @@ fi
 
 sudo ls > /dev/null
 
+version=$(cat cnc_version.yaml | awk -F':' '{print $2}' | head -n1 | tr -d ' ' | tr -d '\n\r')
+cp cnc_values_$version.yaml cnc_values.yaml
+sed -i "1s/^/cnc_version: $version\n/" cnc_values.yaml
+
 # Ansible Install
 ansible_install() {
 	os=$(cat /etc/os-release | grep -iw ID | awk -F'=' '{print $2}') 
@@ -38,7 +42,8 @@ ansible_install() {
 }
 # Prechecks
 prerequisites() {
-code=$(curl --connect-timeout 3 -s -o /dev/null -w "%{http_code}" http://www.google.com)
+url=$(cat cnc_values.yaml | grep k8s_apt_key | awk -F '//' '{print $2}' | awk -F'/' '{print $1}')
+code=$(curl --connect-timeout 3 -s -o /dev/null -w "%{http_code}" http://$url)
 echo "Checking this system has valid prerequisites"
 echo
 if [ $code == 200 ]; then
@@ -60,11 +65,8 @@ else
 	echo
 fi
 
-version=$(cat cnc_version.yaml | awk -F':' '{print $2}' | head -n1 | tr -d ' ' | tr -d '\n\r')
-cp cnc_values_$version.yaml cnc_values.yaml
-sed -i "1s/^/cnc_version: $version\n/" cnc_values.yaml
 
-	if [ $1 == "install" ]; then
+if [ $1 == "install" ]; then
 	echo
         echo "Installing NVIDIA Cloud Native Core Version $version"
 		id=$(sudo dmidecode --string system-uuid | awk -F'-' '{print $1}' | cut -c -3)
@@ -80,15 +82,15 @@ sed -i "1s/^/cnc_version: $version\n/" cnc_values.yaml
 		fi
 
 	ansible-playbook -i hosts cnc-installation.yaml
-	elif [ $1 == "uninstall" ]; then
+elif [ $1 == "uninstall" ]; then
 	echo
 	echo "Unstalling NVIDIA Cloud Native Core"
         ansible-playbook -i hosts cnc-uninstall.yaml
-	elif [ $1 == "validate" ]; then
+elif [ $1 == "validate" ]; then
 	echo
 	echo "Validating NVIDIA Cloud Native Core"
         ansible-playbook -i hosts cnc-validation.yaml
-	else
+else
 	echo -e "Usage: \n bash setup.sh [OPTIONS]\n \n Available Options: \n      install     Install NVIDIA Cloud Native Core\n      validate    Validate NVIDIA Cloud Native Core\n      uninstall   Uninstall NVIDIA Cloud Native Core"
         echo
         exit 1
